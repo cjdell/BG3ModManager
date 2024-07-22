@@ -14,6 +14,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Toolbox", "src\Toolbox\Toolbox.csproj", "{2F2EF4FE-7254-425A-8DE9-47457CC057C6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AlphaFS", "AlphaFS", "{33CC7567-DED2-4554-BD65-2F94827AD4CB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{DD73FD72-4BB6-4597-BB53-0B48D16381D5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlphaFS", "AlphaFS\src\AlphaFS\AlphaFS.csproj", "{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -45,11 +51,23 @@ Global
 		{2F2EF4FE-7254-425A-8DE9-47457CC057C6}.PublishTest|x64.ActiveCfg = PublishTest|x64
 		{2F2EF4FE-7254-425A-8DE9-47457CC057C6}.PublishTest|x64.Build.0 = PublishTest|x64
 		{2F2EF4FE-7254-425A-8DE9-47457CC057C6}.Release|x64.ActiveCfg = Release|x64
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.Debug|x64.Build.0 = Debug|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.Publish|x64.ActiveCfg = Debug|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.Publish|x64.Build.0 = Debug|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.PublishTest|x64.ActiveCfg = Debug|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.PublishTest|x64.Build.0 = Debug|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.Release|x64.ActiveCfg = Release|Any CPU
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D06B5DA3-3018-43F3-B9F0-2D9D89DB489E}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{DD73FD72-4BB6-4597-BB53-0B48D16381D5} = {33CC7567-DED2-4554-BD65-2F94827AD4CB}
+		{AF8D2D44-8E1A-426A-9417-B7AEAE5F220D} = {DD73FD72-4BB6-4597-BB53-0B48D16381D5}
 	EndGlobalSection
 EndGlobal

@@ -60,11 +60,12 @@
     </Target>
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)\src\Core\DivinityModManagerCore.csproj" />
+        <ProjectReference Include="$(SolutionDir)\AlphaFS\src\AlphaFS\AlphaFS.csproj" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="AdonisUI" Version="1.17.1" />
         <PackageReference Include="AdonisUI.ClassicTheme" Version="1.17.1" />
-        <PackageReference Include="AlphaFS" Version="2.2.6" />
+        <PackageReference Include="AlphaFS" Version="2.3.0" />
         <PackageReference Include="Autoupdater.NET.Official" Version="1.8.4" />
         <PackageReference Include="DynamicData" Version="8.0.2" />
         <PackageReference Include="Extended.Wpf.Toolkit" Version="4.5.1" />

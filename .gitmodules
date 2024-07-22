@@ -1,0 +1,3 @@
+[submodule "AlphaFS"]
+	path = AlphaFS
+	url = git@github.com:cjdell/AlphaFS.git
