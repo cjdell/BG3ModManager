@@ -1,0 +1,4 @@
+{
+    "nix.enableLanguageServer": false,
+    "nix.formatterPath": "/run/current-system/sw/bin/nixfmt"
+}

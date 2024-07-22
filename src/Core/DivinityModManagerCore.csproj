@@ -30,6 +30,21 @@
         <Reference Include="LSLib">
             <HintPath>$(SolutionDir)External\lslib\LSLib.dll</HintPath>
         </Reference>
+        <Reference Include="OpenTK">
+            <HintPath>$(SolutionDir)External\lslib\OpenTK.dll</HintPath>
+        </Reference>
+        <Reference Include="QUT.ShiftReduceParser">
+            <HintPath>$(SolutionDir)External\lslib\QUT.ShiftReduceParser.dll</HintPath>
+        </Reference>
+        <Reference Include="zlib.net">
+            <HintPath>$(SolutionDir)External\lslib\zlib.net.dll</HintPath>
+        </Reference>
+        <Reference Include="LZ4">
+            <HintPath>$(SolutionDir)External\lslib\LZ4.dll</HintPath>
+        </Reference>
+        <Reference Include="LSLibNative">
+            <HintPath>$(SolutionDir)External\lslib\LSLibNative.dll</HintPath>
+        </Reference>
         <Reference Include="Microsoft.CSharp" />
         <Reference Include="Microsoft.VisualBasic" />
         <Reference Include="PresentationCore" />

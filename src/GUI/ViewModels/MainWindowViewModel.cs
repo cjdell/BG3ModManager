@@ -1875,26 +1875,137 @@ Directory the zip will be extracted to:
 			}
 		}
 
+		class UnmanagedFileLoader
+		{
+			public const short FILE_ATTRIBUTE_NORMAL = 0x80;
+			public const short INVALID_HANDLE_VALUE = -1;
+			public const uint GENERIC_READ = 0x80000000;
+			public const uint GENERIC_WRITE = 0x40000000;
+			public const uint CREATE_NEW = 1;
+			public const uint CREATE_ALWAYS = 2;
+			public const uint OPEN_EXISTING = 3;
+
+			// Use interop to call the CreateFile function.
+			// For more information about CreateFile,
+			// see the unmanaged MSDN reference library.
+			[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+			static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(string lpFileName, uint dwDesiredAccess,
+			uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition,
+			uint dwFlagsAndAttributes, IntPtr hTemplateFile);
+
+			private Microsoft.Win32.SafeHandles.SafeFileHandle handleValue = null;
+
+			public UnmanagedFileLoader(string path)
+				=> Load(path);
+
+			public void Load(string path)
+			{
+				if (path == null || path.Length == 0)
+					throw new ArgumentNullException(nameof(path));
+
+				// Try to open the file.
+				handleValue = CreateFile(path, GENERIC_WRITE, 0, IntPtr.Zero, CREATE_NEW, 0, IntPtr.Zero);
+
+				// If the handle is invalid,
+				// get the last Win32 error
+				// and throw a Win32Exception.
+				if (handleValue.IsInvalid)
+					System.Runtime.InteropServices.Marshal.ThrowExceptionForHR(System.Runtime.InteropServices.Marshal.GetHRForLastWin32Error());
+			}
+
+			public Microsoft.Win32.SafeHandles.SafeFileHandle Handle
+			{
+				get
+				{
+					if (!handleValue.IsInvalid)
+						return handleValue;
+					
+					return null;
+				}
+			}
+		}
+
 		private async Task<ImportOperationResults> AddModFromFile(Dictionary<string, DivinityModData> builtinMods, ImportOperationResults taskResult, string filePath, CancellationToken cts, bool toActiveList = false)
 		{
 			var ext = Path.GetExtension(filePath).ToLower();
+			
 			if (ext.Equals(".pak", StringComparison.OrdinalIgnoreCase))
 			{
 				var outputFilePath = Path.Combine(PathwayData.AppDataModsPath, Path.GetFileName(filePath));
+
 				try
 				{
 					taskResult.TotalPaks++;
 
-					using (System.IO.FileStream sourceStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 8192, true))
-					{
-						using (System.IO.FileStream destinationStream = File.Create(outputFilePath))
-						{
-							await sourceStream.CopyToAsync(destinationStream, 8192, cts);
+					
+					// using (System.IO.FileStream sourceStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 8192))
+					// {
+					// 	using (System.IO.FileStream destinationStream = File.Create(outputFilePath))
+					// 	{
+					// 		MessageBox.Show("Copying...");
+					// 		// await sourceStream.CopyToAsync(destinationStream);
+					// 		sourceStream.CopyTo(destinationStream);
+
+					// 		destinationStream.Close();
+					// 	}
+
+					// 	sourceStream.Close();
+					// }
+
+
+					// using (System.IO.FileStream sourceStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 8192)) {
+					// 	using (System.IO.FileStream destinationStream = File.Open(outputFilePath, System.IO.FileMode.OpenOrCreate, System.IO.FileAccess.Write, System.IO.FileShare.None)) {
+					// 		sourceStream.CopyTo(destinationStream);
+
+					// 		destinationStream.Flush();
+					// 		destinationStream.Close();
+					// 		destinationStream.Dispose();
+
+					// 		// STILL doesn't close file handle....
+					// 	}
+					// }
+
+
+					using (System.IO.FileStream sourceStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 8192)) {
+						var loader = new UnmanagedFileLoader(outputFilePath);
+
+						using (System.IO.FileStream destinationStream = new System.IO.FileStream(loader.Handle, System.IO.FileAccess.Write)) {
+							sourceStream.CopyTo(destinationStream);
+
+							destinationStream.Flush();
+							destinationStream.Close();
+							destinationStream.Dispose();
+						}
+
+						loader.Handle.Close();
+						loader.Handle.Dispose();
+
+						// Finally works!
+					}
+
+
+					using (System.IO.FileStream sourceStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 8192)) {
+						using (System.IO.FileStream destinationStream = File.Open(outputFilePath, System.IO.FileMode.OpenOrCreate, System.IO.FileAccess.Write, System.IO.FileShare.None)) {
+							sourceStream.CopyTo(destinationStream);
+
+							ShowOwner(destinationStream);
+
+							// This works too. This culprit???
+							destinationStream.SafeFileHandle.Close();
 						}
 					}
 
+
+					// File.Copy(filePath, outputFilePath);	// This works but we need streams elsewhere to work too...
+
+
+					MessageBox.Show("Sleeping...");
+					System.Threading.Thread.Sleep(5000);
+
 					if (File.Exists(outputFilePath))
 					{
+						MessageBox.Show("Size = " + File.GetSize(outputFilePath));
+
 						var mod = await DivinityModDataLoader.LoadModDataFromPakAsync(outputFilePath, builtinMods, cts);
 						if (mod != null)
 						{
@@ -1909,11 +2020,19 @@ Directory the zip will be extracted to:
 				}
 				catch (System.IO.IOException ex)
 				{
+					MessageBox.Show(ex.ToString());
+					if (ex.InnerException != null) {
+						MessageBox.Show(ex.InnerException.ToString());
+					}
 					DivinityApp.Log($"File may be in use by another process:\n{ex}");
 					ShowAlert($"Failed to copy file '{Path.GetFileName(filePath)} - It may be locked by another process'", AlertType.Danger);
 				}
 				catch (Exception ex)
 				{
+					MessageBox.Show(ex.ToString());
+					if (ex.InnerException != null) {
+						MessageBox.Show(ex.InnerException.ToString());
+					}
 					DivinityApp.Log($"Error reading file ({filePath}):\n{ex}");
 				}
 			}
@@ -1923,13 +2042,58 @@ Directory the zip will be extracted to:
 			}
 			else if(_compressedFormats.Contains(ext, StringComparer.OrdinalIgnoreCase))
 			{
-				await ImportCompressedFileAsync(builtinMods, taskResult, filePath, ext, true, cts, toActiveList);
+				//await ImportCompressedFileAsync(builtinMods, taskResult, filePath, ext, true, cts, toActiveList);
 			}
 			return taskResult;
 		}
 
+		public void ShowOwner(System.IO.FileStream fileStream) {
+			// Get the type of MyClass
+			Type type = fileStream.GetType();
+
+			// Get the FieldInfo object for the private field 'owner'
+			FieldInfo fieldInfo = type.GetField("owner", BindingFlags.NonPublic | BindingFlags.Instance);
+
+			// Check if the field was found
+			if (fieldInfo != null)
+			{
+				// Get the value of the private field for the instance 'myObject'
+				var ownerValue = (bool)fieldInfo.GetValue(fileStream);
+
+				// Print the value
+				MessageBox.Show($"Owner: {ownerValue}");
+			}
+			else
+			{
+				MessageBox.Show("Field 'owner' not found.");
+			}
+		}
+
+		// public void Foo() {
+		// 	var filePath = "foo";
+		// 	var outputFilePath = "bar";
+
+		// 	using (System.IO.FileStream sourceStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 8192)) {
+		// 		using (System.IO.FileStream destinationStream = File.Open(outputFilePath, System.IO.FileMode.OpenOrCreate, System.IO.FileAccess.Write, System.IO.FileShare.Write)) {
+		// 			sourceStream.CopyTo(destinationStream);
+
+		// 			// File does not close automatically (see `lsof`) so we must close it ourselves.
+		// 			// Same no matter FileShare or any other parameter.
+		// 			destinationStream.SafeFileHandle.Close();
+		// 		}
+		// 	}
+
+		// 	// Sleep for a bit so I can inspect with `lsof`...
+		// 	System.Threading.Thread.Sleep(5000);
+
+		// 	// "Sharing Violation" error would occur here reliably everytime if not for the call to "SafeFileHandle.Close()" above.
+		// 	MessageBox.Show("Size = " + File.GetSize(outputFilePath));
+		// }
+
 		public void ImportMods(IEnumerable<string> files, bool toActiveList = false)
 		{
+			MessageBox.Show(String.Join("\n", files.ToArray()));
+
 			if (!MainProgressIsActive)
 			{
 				MainProgressTitle = "Importing mods.";
@@ -1972,11 +2136,14 @@ Directory the zip will be extracted to:
 								Directory.CreateDirectory(logsDir);
 							}
 							File.WriteAllText(errorOutputPath, String.Join("\n", result.Errors.Select(x => $"File: {x.File}\nError:\n{x.Exception}")));
+							MessageBox.Show(String.Join("\n", result.Errors.Select(x => $"File: {x.File}\nError:\n{x.Exception}")));
 						}
 
 						var total = result.Mods.Count;
 						if (result.Success)
 						{
+							MessageBox.Show("Mods: " + result.Mods.Count);
+
 							if (result.Mods.Count > 1)
 							{
 								ShowAlert($"Successfully imported {total} mods", AlertType.Success, 20);
@@ -3211,158 +3378,158 @@ Directory the zip will be extracted to:
 			DivinityApp.Log($"Imported Mod: {mod}");
 		}
 
-		private async Task<bool> ImportCompressedFileAsync(Dictionary<string, DivinityModData> builtinMods, ImportOperationResults taskResult, string filePath, string extension, bool onlyMods, CancellationToken cts, bool toActiveList = false)
-		{
-			System.IO.FileStream fileStream = null;
-			string outputDirectory = PathwayData.AppDataModsPath;
-			double taskStepAmount = 1.0 / 4;
-			bool success = false;
-			var jsonFiles = new Dictionary<string, string>();
-			try
-			{
-				fileStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 4096, true);
-				if (fileStream != null)
-				{
-					var info = NexusModFileVersionData.FromFilePath(filePath);
+		// private async Task<bool> ImportCompressedFileAsync(Dictionary<string, DivinityModData> builtinMods, ImportOperationResults taskResult, string filePath, string extension, bool onlyMods, CancellationToken cts, bool toActiveList = false)
+		// {
+		// 	System.IO.FileStream fileStream = null;
+		// 	string outputDirectory = PathwayData.AppDataModsPath;
+		// 	double taskStepAmount = 1.0 / 4;
+		// 	bool success = false;
+		// 	var jsonFiles = new Dictionary<string, string>();
+		// 	try
+		// 	{
+		// 		fileStream = File.Open(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 4096, true);
+		// 		if (fileStream != null)
+		// 		{
+		// 			var info = NexusModFileVersionData.FromFilePath(filePath);
 
-					await fileStream.ReadAsync(new byte[fileStream.Length], 0, (int)fileStream.Length);
-					fileStream.Position = 0;
-					IncreaseMainProgressValue(taskStepAmount);
-                    System.IO.Stream decompressionStream = null;
-                    System.IO.Stream outputStream = null;
+		// 			await fileStream.ReadAsync(new byte[fileStream.Length], 0, (int)fileStream.Length);
+		// 			fileStream.Position = 0;
+		// 			IncreaseMainProgressValue(taskStepAmount);
+        //             System.IO.Stream decompressionStream = null;
+        //             System.IO.Stream outputStream = null;
 
-					try
-					{
-						switch (extension)
-						{
-							case ".bz2":
-								decompressionStream = new BZip2Stream(fileStream, SharpCompress.Compressors.CompressionMode.Decompress, true);
-								break;
-							case ".xz":
-								decompressionStream = new XZStream(fileStream);
-								break;
-							case ".zst":
-								decompressionStream = new DecompressionStream(fileStream);
-								break;
-						}
-						if (decompressionStream != null)
-						{
-							DivinityApp.Log($"Checking if compressed file ({extension}) is a pak.");
-							var outputName = Path.GetFileNameWithoutExtension(filePath) + ".pak";
-							var outputFilePath = Path.Combine(outputDirectory, outputName);
-							//outputStream = new System.IO.FileStream(Path.Combine(Path.GetDirectoryName(filePath), "Test.pak"), System.IO.FileMode.OpenOrCreate);
-							outputStream = new System.IO.MemoryStream();
-							await decompressionStream.CopyToAsync(outputStream, 4096, cts);
+		// 			try
+		// 			{
+		// 				switch (extension)
+		// 				{
+		// 					case ".bz2":
+		// 						decompressionStream = new BZip2Stream(fileStream, SharpCompress.Compressors.CompressionMode.Decompress, true);
+		// 						break;
+		// 					case ".xz":
+		// 						decompressionStream = new XZStream(fileStream);
+		// 						break;
+		// 					case ".zst":
+		// 						decompressionStream = new DecompressionStream(fileStream);
+		// 						break;
+		// 				}
+		// 				if (decompressionStream != null)
+		// 				{
+		// 					DivinityApp.Log($"Checking if compressed file ({extension}) is a pak.");
+		// 					var outputName = Path.GetFileNameWithoutExtension(filePath) + ".pak";
+		// 					var outputFilePath = Path.Combine(outputDirectory, outputName);
+		// 					//outputStream = new System.IO.FileStream(Path.Combine(Path.GetDirectoryName(filePath), "Test.pak"), System.IO.FileMode.OpenOrCreate);
+		// 					outputStream = new System.IO.MemoryStream();
+		// 					await decompressionStream.CopyToAsync(outputStream, 4096, cts);
 
-							try
-							{
-								var mod = await DivinityModDataLoader.LoadModDataFromPakAsync(outputStream, outputFilePath, builtinMods, cts);
-								if (mod != null)
-								{
-									try
-									{
-										mod.LastModified = File.GetChangeTime(filePath);
-										mod.LastUpdated = mod.LastModified;
-									}
-									catch (Exception ex)
-									{
-										DivinityApp.Log($"Error getting pak last modified date for '{ex}': {ex}");
-									}
+		// 					try
+		// 					{
+		// 						var mod = await DivinityModDataLoader.LoadModDataFromPakAsync(outputStream, outputFilePath, builtinMods, cts);
+		// 						if (mod != null)
+		// 						{
+		// 							try
+		// 							{
+		// 								mod.LastModified = File.GetChangeTime(filePath);
+		// 								mod.LastUpdated = mod.LastModified;
+		// 							}
+		// 							catch (Exception ex)
+		// 							{
+		// 								DivinityApp.Log($"Error getting pak last modified date for '{ex}': {ex}");
+		// 							}
 
-									if (!outputName.Contains(mod.Name))
-									{
-										var nameFromMeta = $"{mod.Folder}.pak";
-										outputFilePath = Path.Combine(outputDirectory, nameFromMeta);
-										mod.FilePath = outputFilePath;
-									}
-									using (var fs = File.Create(outputFilePath, 4096, System.IO.FileOptions.Asynchronous))
-									{
-										try
-										{
-											await decompressionStream.CopyToAsync(fs, 4096, cts);
-											success = true;
-										}
-										catch (Exception ex)
-										{
-											taskResult.AddError(outputFilePath, ex);
-											DivinityApp.Log($"Error copying file '{outputName}' from archive to '{outputFilePath}':\n{ex}");
-										}
-									}
+		// 							if (!outputName.Contains(mod.Name))
+		// 							{
+		// 								var nameFromMeta = $"{mod.Folder}.pak";
+		// 								outputFilePath = Path.Combine(outputDirectory, nameFromMeta);
+		// 								mod.FilePath = outputFilePath;
+		// 							}
+		// 							using (var fs = File.Create(outputFilePath, 4096, System.IO.FileOptions.Asynchronous))
+		// 							{
+		// 								try
+		// 								{
+		// 									await decompressionStream.CopyToAsync(fs, 4096, cts);
+		// 									success = true;
+		// 								}
+		// 								catch (Exception ex)
+		// 								{
+		// 									taskResult.AddError(outputFilePath, ex);
+		// 									DivinityApp.Log($"Error copying file '{outputName}' from archive to '{outputFilePath}':\n{ex}");
+		// 								}
+		// 							}
 
-									if (success)
-									{
-										taskResult.TotalPaks++;
-										taskResult.Mods.Add(mod);
-										mod.NexusModsData.SetModVersion(info);
-										await Observable.Start(() =>
-										{
-											AddImportedMod(mod, toActiveList);
-											return Unit.Default;
-										}, RxApp.MainThreadScheduler);
-									}
-								}
-							}
-							catch(Exception ex)
-							{
-								DivinityApp.Log($"Error reading decompressed file '{filePath}' as pak:\n{ex}");
-							}
-						}
-					}
-					catch(Exception ex)
-					{
-						DivinityApp.Log($"Error reading file '{filePath}':\n{ex}");
-					}
-					finally
-					{
-						decompressionStream?.Dispose();
-						outputStream?.Dispose();
-					}
+		// 							if (success)
+		// 							{
+		// 								taskResult.TotalPaks++;
+		// 								taskResult.Mods.Add(mod);
+		// 								mod.NexusModsData.SetModVersion(info);
+		// 								await Observable.Start(() =>
+		// 								{
+		// 									AddImportedMod(mod, toActiveList);
+		// 									return Unit.Default;
+		// 								}, RxApp.MainThreadScheduler);
+		// 							}
+		// 						}
+		// 					}
+		// 					catch(Exception ex)
+		// 					{
+		// 						DivinityApp.Log($"Error reading decompressed file '{filePath}' as pak:\n{ex}");
+		// 					}
+		// 				}
+		// 			}
+		// 			catch(Exception ex)
+		// 			{
+		// 				DivinityApp.Log($"Error reading file '{filePath}':\n{ex}");
+		// 			}
+		// 			finally
+		// 			{
+		// 				decompressionStream?.Dispose();
+		// 				outputStream?.Dispose();
+		// 			}
 
-					if (info.Success && success)
-					{
-						//Still save cache from imported zips, even if we aren't updating
-						await UpdateHandler.Nexus.SaveCacheAsync(false, Version, MainProgressToken.Token);
-					}
+		// 			if (info.Success && success)
+		// 			{
+		// 				//Still save cache from imported zips, even if we aren't updating
+		// 				await UpdateHandler.Nexus.SaveCacheAsync(false, Version, MainProgressToken.Token);
+		// 			}
 
-					IncreaseMainProgressValue(taskStepAmount);
-				}
-			}
-			catch (Exception ex)
-			{
-				DivinityApp.Log($"Error extracting package: {ex}");
-				RxApp.MainThreadScheduler.Schedule(_ =>
-				{
-					taskResult.AddError(filePath, ex);
-					ShowAlert($"Error extracting archive (check the log): {ex.Message}", AlertType.Danger, 0);
-				});
-			}
-			finally
-			{
-				RxApp.MainThreadScheduler.Schedule(_ => MainProgressWorkText = $"Cleaning up...");
-				fileStream?.Close();
-				IncreaseMainProgressValue(taskStepAmount);
+		// 			IncreaseMainProgressValue(taskStepAmount);
+		// 		}
+		// 	}
+		// 	catch (Exception ex)
+		// 	{
+		// 		DivinityApp.Log($"Error extracting package: {ex}");
+		// 		RxApp.MainThreadScheduler.Schedule(_ =>
+		// 		{
+		// 			taskResult.AddError(filePath, ex);
+		// 			ShowAlert($"Error extracting archive (check the log): {ex.Message}", AlertType.Danger, 0);
+		// 		});
+		// 	}
+		// 	finally
+		// 	{
+		// 		RxApp.MainThreadScheduler.Schedule(_ => MainProgressWorkText = $"Cleaning up...");
+		// 		fileStream?.Close();
+		// 		IncreaseMainProgressValue(taskStepAmount);
 
-				if (!onlyMods && jsonFiles.Count > 0)
-				{
-					RxApp.MainThreadScheduler.Schedule(_ =>
-					{
-						foreach (var kvp in jsonFiles)
-						{
-							DivinityLoadOrder order = DivinityJsonUtils.SafeDeserialize<DivinityLoadOrder>(kvp.Value);
-							if (order != null)
-							{
-								taskResult.Orders.Add(order);
-								order.Name = kvp.Key;
-								DivinityApp.Log($"Imported mod order from archive: {String.Join(@"\n\t", order.Order.Select(x => x.Name))}");
-								AddNewModOrder(order);
-							}
-						}
-					});
-				}
-				IncreaseMainProgressValue(taskStepAmount);
-			}
-			return success;
-		}
+		// 		if (!onlyMods && jsonFiles.Count > 0)
+		// 		{
+		// 			RxApp.MainThreadScheduler.Schedule(_ =>
+		// 			{
+		// 				foreach (var kvp in jsonFiles)
+		// 				{
+		// 					DivinityLoadOrder order = DivinityJsonUtils.SafeDeserialize<DivinityLoadOrder>(kvp.Value);
+		// 					if (order != null)
+		// 					{
+		// 						taskResult.Orders.Add(order);
+		// 						order.Name = kvp.Key;
+		// 						DivinityApp.Log($"Imported mod order from archive: {String.Join(@"\n\t", order.Order.Select(x => x.Name))}");
+		// 						AddNewModOrder(order);
+		// 					}
+		// 				}
+		// 			});
+		// 		}
+		// 		IncreaseMainProgressValue(taskStepAmount);
+		// 	}
+		// 	return success;
+		// }
 
 		private async Task<bool> ImportArchiveAsync(Dictionary<string, DivinityModData> builtinMods, ImportOperationResults taskResult, string archivePath, bool onlyMods, CancellationToken cts, bool toActiveList = false)
 		{

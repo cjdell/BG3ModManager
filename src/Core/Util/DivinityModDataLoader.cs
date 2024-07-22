@@ -693,26 +693,26 @@ namespace DivinityModManager.Util
 			return null;
 		}
 
-		public static async Task<DivinityModData> LoadModDataFromPakAsync(System.IO.Stream stream, string pakPath, Dictionary<string, DivinityModData> builtinMods, CancellationToken cts)
-		{
-			try
-			{
-				while (!cts.IsCancellationRequested)
-				{
-					stream.Position = 0;
-					using (var pr = new LSLib.LS.PackageReader())
-					{
-						var pak = pr.Read(stream);
-						return await InternalLoadModDataFromPakAsync(pak, pakPath, builtinMods);
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				DivinityApp.Log($"Error loading mod pak from stream:\n{ex}");
-			}
-			return null;
-		}
+		// public static async Task<DivinityModData> LoadModDataFromPakAsync(System.IO.Stream stream, string pakPath, Dictionary<string, DivinityModData> builtinMods, CancellationToken cts)
+		// {
+		// 	try
+		// 	{
+		// 		while (!cts.IsCancellationRequested)
+		// 		{
+		// 			stream.Position = 0;
+		// 			using (var pr = new LSLib.LS.PackageReader())
+		// 			{
+		// 				var pak = pr.Read(stream);
+		// 				return await InternalLoadModDataFromPakAsync(pak, pakPath, builtinMods);
+		// 			}
+		// 		}
+		// 	}
+		// 	catch (Exception ex)
+		// 	{
+		// 		DivinityApp.Log($"Error loading mod pak from stream:\n{ex}");
+		// 	}
+		// 	return null;
+		// }
 
 		public static async Task<ModLoadingResults> LoadModPackageDataAsync(string modsFolderPath, CancellationToken cts)
 		{
